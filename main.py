@@ -88,6 +88,7 @@ def propagate(w, b, X, Y):
     cost = np.squeeze(cost)
     assert(cost.shape == ())
 
+    aaa=1
     #创建一个字典，把dw和db保存起来。
     grads = {
                 "dw": dw,
