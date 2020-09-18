@@ -7,31 +7,16 @@ sigmoid = lambda x: 1. / (1 + np.exp(-x))
 
 def load_data():
     train_set = h5py.File('datasets/train_catvnoncat.h5', 'r')
-    train_set_feature = np.array(train_set['train_set_x'])  # (209,64,64,3)
+    train_set_image = np.array(train_set['train_set_x'])  # (209,64,64,3)
     train_set_label = np.array(train_set['train_set_y'])  # (209,)    [0 0 1 0 0]
     train_set_label = train_set_label.reshape((1, train_set_label.shape[0]))  # (1, 209)
 
     test_set = h5py.File('datasets/test_catvnoncat.h5', 'r')
-    test_set_feature = np.array(test_set['test_set_x'])  # (50,64,64,3)
+    test_set_image = np.array(test_set['test_set_x'])  # (50,64,64,3)
     test_set_label = np.array(test_set['test_set_y'])  # (50,) [1 1 1 1 1 0 1...]
     test_set_label = test_set_label.reshape((1, test_set_label.shape[0]))  # (1, 50)
 
-    classes = np.array(test_set['list_classes'])  # [b'non-cat' b'cat']
-
-    return train_set_feature, train_set_label, test_set_feature, test_set_label, classes
-
-
-# 读取数据
-train_set_feature, train_set_label, test_set_feature, test_set_label, classes = load_data()
-train_set_num = train_set_label.shape[1]
-test_set_num = test_set_label.shape[1]
-num_px = train_set_feature.shape[1]
-# 将训练集的特征列表降维为(64*64*3, 209), 并将颜色值/255, 使得每个元素在[0,1]之间
-train_set_feature = train_set_feature.reshape(train_set_feature.shape[0], -1).T
-train_set_feature = train_set_feature / 255
-# 将特征集的特征列表降维为(64*64*3, 50), 并将颜色值/255, 使得每个元素在[0,1]之间
-test_set_feature = test_set_feature.reshape(test_set_feature.shape[0], -1).T
-test_set_feature = test_set_feature / 255
+    return train_set_image, train_set_label, test_set_image, test_set_label
 
 
 def initWb(dim):
@@ -52,31 +37,32 @@ def propagate(W, b, X, Y):
     m = X.shape[1]
     # 正向传播
     A = sigmoid(np.dot(W, X) + b)
-    L = np.sum(-Y * np.log(A) - (1 - Y) * np.log(1 - A)) / m
+    J = np.sum(-Y * np.log(A) - (1 - Y) * np.log(1 - A)) / m
+    J = np.squeeze(J)
     # 反向传播
     dW = (1 / m) * np.dot(A - Y, X.T)
     db = (1 / m) * np.sum(A - Y)
     grad = {'dW': dW, 'db': db}
-    return (grad, L)
+    return (grad, J)
 
 
 def optimize(W, b, X, Y, num_iter, lr, isPrint=True):
-    Ls = []
+    Js = []
     for i in range(num_iter):
-        grad, L = propagate(W, b, X, Y)
+        grad, J = propagate(W, b, X, Y)
         dW = grad['dW']
         db = grad['db']
-        W = W - lr * dW
-        b = b - lr * db
+        W -= lr * dW
+        b -= lr * db
         # 每迭代100次,记录1次损失函数的值
         if (i % 100 == 0):
-            Ls.append(L)
+            Js.append(J)
             if (isPrint):
-                print("迭代的次数: %i ， 误差值： %f" % (i, L))
+                print("迭代的次数: %i ， 误差值： %f" % (i, J))
 
     Wb = {'W': W, 'b': b}
     grad = {'dW': dW, 'db': db}
-    return (Wb, grad, Ls)
+    return (Wb, grad, Js)
 
 
 def predict(W, b, X):
@@ -93,22 +79,35 @@ def predict(W, b, X):
     return Y_hat
 
 
-def model(train_feature, train_label, test_feature, test_label, num_iter=2000, lr=0.5, isPrint=True):
-    W, b = initWb(train_feature.shape[0])
-    Wb, grad, Ls = optimize(W, b, train_feature, train_label, num_iter, lr, isPrint)
+def model(train_image, train_label, test_image, test_label, num_iter=2000, lr=0.5, isPrint=True):
+    W, b = initWb(train_image.shape[0])
+    Wb, grad, Js = optimize(W, b, train_image, train_label, num_iter, lr, isPrint)
     W, b = Wb['W'], Wb['b']
-    Y_hat_train = predict(W, b, train_feature)
-    Y_hat_test = predict(W, b, test_feature)
+    Y_hat_train = predict(W, b, train_image)
+    Y_hat_test = predict(W, b, test_image)
     print("训练集准确性:", 100 - np.mean(np.abs(Y_hat_train - train_label)) * 100, '%')
     print("测试集准确性:", 100 - np.mean(np.abs(Y_hat_test - test_label)) * 100, '%')
-    d = {'Ls': Ls, 'Y_hat_train': Y_hat_train, 'Y_hat_test': Y_hat_test, 'W': W, 'b': b, 'lr': lr, 'num_iter': num_iter}
+    d = {'Js': Js, 'Y_hat_train': Y_hat_train, 'Y_hat_test': Y_hat_test, 'W': W, 'b': b, 'lr': lr, 'num_iter': num_iter}
     return d
 
+# 读取数据
+train_set_image, train_set_label, test_set_image, test_set_label = load_data()
+train_set_num = train_set_label.shape[1]
+test_set_num = test_set_label.shape[1]
+num_px = train_set_image.shape[1]
 
-d = model(train_set_feature, train_set_label, test_set_feature, test_set_label)
-Ls = np.squeeze(d['Ls'])
-plt.plot(Ls)
+# 将训练集的特征列表降维为(64*64*3, 209), 并将颜色值/255, 使得每个元素在[0,1]之间
+train_set_image = train_set_image.reshape(train_set_image.shape[0], -1).T
+train_set_image = train_set_image / 255
+# 将特征集的特征列表降维为(64*64*3, 50), 并将颜色值/255, 使得每个元素在[0,1]之间
+test_set_image = test_set_image.reshape(test_set_image.shape[0], -1).T
+test_set_image = test_set_image / 255
+# 模型训练并测试
+d = model(train_set_image, train_set_label, test_set_image, test_set_label, lr=0.005)
+# 绘制
+Js = np.squeeze(d['Js'])
+plt.plot(Js)
 plt.xlabel('iteration(per hundreds)')
-plt.ylabel('Losses')
+plt.ylabel('cost')
 plt.title('lr=' + str(d['lr']))
 plt.show()
