@@ -90,6 +90,7 @@ def model(train_image, train_label, test_image, test_label, num_iter=2000, lr=0.
     d = {'Js': Js, 'Y_hat_train': Y_hat_train, 'Y_hat_test': Y_hat_test, 'W': W, 'b': b, 'lr': lr, 'num_iter': num_iter}
     return d
 
+
 # 读取数据
 train_set_image, train_set_label, test_set_image, test_set_label = load_data()
 train_set_num = train_set_label.shape[1]
@@ -103,11 +104,16 @@ train_set_image = train_set_image / 255
 test_set_image = test_set_image.reshape(test_set_image.shape[0], -1).T
 test_set_image = test_set_image / 255
 # 模型训练并测试
-d = model(train_set_image, train_set_label, test_set_image, test_set_label, lr=0.005)
+d1 = model(train_set_image, train_set_label, test_set_image, test_set_label, lr=0.001, num_iter=2000)
+d2 = model(train_set_image, train_set_label, test_set_image, test_set_label, lr=0.005, num_iter=2000)
+d3 = model(train_set_image, train_set_label, test_set_image, test_set_label, lr=0.01, num_iter=2000)
 # 绘制
-Js = np.squeeze(d['Js'])
-plt.plot(Js)
+plt.plot([i for i in range(1, 21)], d1['Js'], label='lr=0.001')
+plt.plot([i for i in range(1, 21)], d2['Js'], label='lr=0.005')
+plt.plot([i for i in range(1, 21)], d3['Js'], label='lr=0.01')
+plt.legend()  # 添加图例
 plt.xlabel('iteration(per hundreds)')
 plt.ylabel('cost')
-plt.title('lr=' + str(d['lr']))
+plt.xticks(range(1, 21, 2))
+plt.title('num_iter=2000')
 plt.show()
